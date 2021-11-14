@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { Button } from 'antd';
 import { ModalWrapper } from '../Modal';
 import { useGlobalKeyDown } from '@/hooks/useGlobalKeyDown';
-import { isEnterHotkey, isEscHotkey } from '@/utils/hot-key';
+import { isEnterHotkey } from '@/utils/hot-key';
 
 const createImage = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -102,7 +102,6 @@ function getCroppedImg(
 export const ModalAvatarCropper: React.FC<{
   imageUrl: string;
   onConfirm: (croppedImageBlobUrl: string) => void;
-  onCancel: () => void;
 }> = React.memo((props) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -111,9 +110,6 @@ export const ModalAvatarCropper: React.FC<{
   useGlobalKeyDown((e) => {
     if (isEnterHotkey(e)) {
       handleConfirm();
-    } else if (isEscHotkey(e)) {
-      e.stopPropagation();
-      props.onCancel();
     }
   });
 
