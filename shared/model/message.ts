@@ -1,5 +1,10 @@
 import { request } from '../api/request';
 
+export interface ChatMessageReaction {
+  name: string;
+  author: string;
+}
+
 export interface ChatMessage {
   _id: string;
 
@@ -11,7 +16,7 @@ export interface ChatMessage {
 
   converseId: string;
 
-  reactions?: any[];
+  reactions?: ChatMessageReaction[];
 
   hasRecall?: boolean;
 
@@ -75,6 +80,14 @@ export async function recallMessage(messageId: string): Promise<ChatMessage> {
   return data;
 }
 
+export async function deleteMessage(messageId: string): Promise<boolean> {
+  const { data } = await request.post('/api/chat/message/deleteMessage', {
+    messageId,
+  });
+
+  return data;
+}
+
 /**
  * 基于会话id获取会话最后一条消息的id
  */
@@ -87,6 +100,21 @@ export async function fetchConverseLastMessages(
       converseIds,
     }
   );
+
+  return data;
+}
+
+/**
+ * 增加表情行为
+ */
+export async function addReaction(
+  messageId: string,
+  emoji: string
+): Promise<boolean> {
+  const { data } = await request.post('/api/chat/message/addReaction', {
+    messageId,
+    emoji,
+  });
 
   return data;
 }

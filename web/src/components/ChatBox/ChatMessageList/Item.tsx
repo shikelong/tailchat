@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ChatMessage,
   formatShortTime,
@@ -7,53 +7,27 @@ import {
   SYSTEM_USERID,
   t,
   useCachedUserInfo,
-  useChatBoxContext,
   MessageHelper,
-  recallMessage,
   useAsync,
   getCachedUserInfo,
-  useAsyncRequest,
 } from 'tailchat-shared';
 import { Avatar } from '@/components/Avatar';
 import { useRenderPluginMessageInterpreter } from './useRenderPluginMessageInterpreter';
 import { getMessageRender } from '@/plugin/common';
 import { Icon } from '@iconify/react';
-import { Divider, Dropdown, Menu } from 'antd';
+import { Divider, Dropdown } from 'antd';
 import { UserName } from '@/components/UserName';
 import './item.less';
+import clsx from 'clsx';
+import { useChatMessageItemAction } from './useChatMessageItemAction';
+import { useChatMessageReaction } from './useChatMessageReaction';
+import { DevContainer } from '@/components/DevContainer';
+import { TcPopover } from '@/components/TcPopover';
+import { useMessageReactions } from './useMessageReactions';
 
 /**
- * 消息的会话操作
+ * 消息引用
  */
-function useChatMessageItemAction(payload: ChatMessage): React.ReactElement {
-  const context = useChatBoxContext();
-
-  const [, handleRecallMessage] = useAsyncRequest(() => {
-    return recallMessage(payload._id);
-  }, [payload._id]);
-
-  return (
-    <Menu>
-      {context.hasContext && (
-        <Menu.Item
-          key="reply"
-          icon={<Icon icon="mdi:reply" />}
-          onClick={() => context.setReplyMsg(payload)}
-        >
-          {t('回复')}
-        </Menu.Item>
-      )}
-      <Menu.Item
-        key="recall"
-        icon={<Icon icon="mdi:restore" />}
-        onClick={handleRecallMessage}
-      >
-        {t('撤回')}
-      </Menu.Item>
-    </Menu>
-  );
-}
-
 const MessageQuote: React.FC<{ payload: ChatMessage }> = React.memo(
   ({ payload }) => {
     const quote = useMemo(
@@ -75,17 +49,32 @@ const MessageQuote: React.FC<{ payload: ChatMessage }> = React.memo(
 );
 MessageQuote.displayName = 'MessageQuote';
 
+const MessageActionIcon: React.FC<{ icon: string }> = (props) => (
+  <div className="px-0.5 w-6 h-6 flex justify-center items-center opacity-60 hover:opacity-100">
+    <Icon icon={props.icon} />
+  </div>
+);
+
 /**
  * 普通消息
  */
 const NormalMessage: React.FC<ChatMessageItemProps> = React.memo((props) => {
   const { showAvatar, payload } = props;
   const userInfo = useCachedUserInfo(payload.author ?? '');
+  const [isActionBtnActive, setIsActionBtnActive] = useState(false);
 
-  const actions = useChatMessageItemAction(payload);
+  const reactions = useMessageReactions(payload);
+
+  const emojiAction = useChatMessageReaction(payload);
+  const moreActions = useChatMessageItemAction(payload);
 
   return (
-    <div className="chat-message-item flex px-2 group hover:bg-black hover:bg-opacity-10 relative">
+    <div
+      className={clsx('chat-message-item flex px-2 group relative', {
+        'bg-black bg-opacity-10': isActionBtnActive,
+        'hover:bg-black hover:bg-opacity-10': !isActionBtnActive,
+      })}
+    >
       {/* 头像 */}
       <div className="w-18 flex items-start justify-center pt-0.5">
         {showAvatar ? (
@@ -116,14 +105,46 @@ const NormalMessage: React.FC<ChatMessageItemProps> = React.memo((props) => {
           {/* 解释器按钮 */}
           {useRenderPluginMessageInterpreter(payload.content)}
         </div>
+
+        {reactions}
       </div>
 
       {/* 操作 */}
-      <Dropdown overlay={actions} placement="bottomLeft" trigger={['click']}>
-        <div className="opacity-0 group-hover:opacity-100 bg-black bg-opacity-5 hover:bg-opacity-10 rounded px-0.5 absolute right-2 top-0.5 cursor-pointer">
-          <Icon icon="mdi:dots-horizontal" />
-        </div>
-      </Dropdown>
+      <div
+        className={clsx(
+          'bg-white dark:bg-black rounded absolute right-2 cursor-pointer -top-3 shadow-sm flex',
+          {
+            'opacity-0 group-hover:opacity-100 bg-opacity-80 hover:bg-opacity-100':
+              !isActionBtnActive,
+            'opacity-100 bg-opacity-100': isActionBtnActive,
+          }
+        )}
+      >
+        <DevContainer>
+          <TcPopover
+            overlayClassName="chat-message-item_action-popover"
+            content={emojiAction}
+            placement="bottomLeft"
+            trigger={['click']}
+            onVisibleChange={setIsActionBtnActive}
+          >
+            <div>
+              <MessageActionIcon icon="mdi:emoticon-happy-outline" />
+            </div>
+          </TcPopover>
+        </DevContainer>
+
+        <Dropdown
+          overlay={moreActions}
+          placement="bottomLeft"
+          trigger={['click']}
+          onVisibleChange={setIsActionBtnActive}
+        >
+          <div>
+            <MessageActionIcon icon="mdi:dots-horizontal" />
+          </div>
+        </Dropdown>
+      </div>
     </div>
   );
 });
@@ -175,22 +196,25 @@ interface ChatMessageItemProps {
 const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo((props) => {
   const payload = props.payload;
   if (payload.author === SYSTEM_USERID) {
+    // 系统消息
     return <SystemMessage {...props} />;
   } else if (payload.hasRecall === true) {
+    // 撤回消息
     return (
       <SystemMessageWithNickname
         {...props}
         userIds={[payload.author ?? SYSTEM_USERID]}
-        overwritePayload={(nickname) => ({
+        overwritePayload={(nicknameList) => ({
           ...payload,
           content: t('{{nickname}} 撤回了一条消息', {
-            nickname: nickname[0] ?? '',
+            nickname: nicknameList[0] || '',
           }),
         })}
       />
     );
   }
 
+  // 普通消息
   return <NormalMessage {...props} />;
 });
 ChatMessageItem.displayName = 'ChatMessageItem';

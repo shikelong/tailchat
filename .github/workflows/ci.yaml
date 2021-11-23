@@ -33,5 +33,9 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Check Type
         run: cd web && yarn check:type
+      - name: Test
+        run: yarn test
+        env:
+          TZ: Asia/Shanghai
       - name: Check Build
         run: cd web && yarn build
